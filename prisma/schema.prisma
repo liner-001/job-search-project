@@ -1,5 +1,5 @@
 // Prisma schema
-// Run: pnpm dlx prisma generate && pnpm dlx prisma migrate dev --name init
+// Run: pnpm dlx prisma generate && pnpm dlx prisma migrate dev --name init 修改 schema 后，需要运行 prisma generate 和 prisma migrate dev
 
 generator client {
   provider = "prisma-client-js"
@@ -37,6 +37,60 @@ model MCPServer {
   oauthStatus   String?       @default("UNKNOWN") // UNKNOWN | NOT_REQUIRED | REQUIRED | CONNECTED | EXPIRED
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
+}
+
+model JobApplication {
+  id          String   @id @default(uuid())
+  company    String
+  position   String
+  status     String   @default("待投递")
+  matchScore Int      @default(75)
+  nextAction String?
+  jobDescriptionId String?
+  jobDescription   JobDescription? @relation(fields: [jobDescriptionId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model JobDescription {
+  id          String   @id @default(uuid())
+  title       String?
+  content     String
+  matchScore  Int
+  level       String
+  strengths   Json
+  weaknesses  Json
+  suggestions Json
+  applications JobApplication[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Resume {
+  id                String   @id @default(uuid())
+  fileName          String
+  score             Int
+  targetRole        String
+  education         String
+  experienceLevel   String
+  skills            Json
+  projectHighlights Json
+  suggestions       Json
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+
+model InterviewSession {
+  id          String   @id @default(uuid())
+  questionId String
+  question   String
+  answer     String
+  score      Int
+  dimensions Json
+  suggestion String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 enum MCPServerType {

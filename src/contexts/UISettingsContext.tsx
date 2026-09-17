@@ -18,7 +18,7 @@ function saveSetting(key: string, value: string | boolean) {
   try {
     const current = loadSettings();
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...current, [key]: value }));
-  } catch {}
+  } catch { }
 }
 
 interface UISettingsContextType {
@@ -43,10 +43,10 @@ export const UISettingsProvider = ({ children }: UISettingsProviderProps) => {
 
   const [hideToolMessages, setHideToolMessages] = useState(false);
   const [provider, setProviderState] = useState<string>(
-    typeof saved.provider === "string" ? saved.provider : "google",
+    typeof saved.provider === "string" ? saved.provider : "openai",
   );
   const [model, setModelState] = useState<string>(
-    typeof saved.model === "string" ? saved.model : "gemini-3-flash-preview",
+    typeof saved.model === "string" ? saved.model : "deepseek-v4-flash",
   );
   const [approveAllTools, setApproveAllToolsState] = useState<boolean>(
     typeof saved.approveAllTools === "boolean" ? saved.approveAllTools : false,

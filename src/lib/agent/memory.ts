@@ -1,3 +1,4 @@
+// 创建 LangGraph 的 PostgreSQL checkpointer 并提供根据 threadId 读取历史消息的能力
 import { BaseMessage } from "@langchain/core/messages";
 import { PostgresSaver } from "@langchain/langgraph-checkpoint-postgres";
 import * as dotenv from "dotenv";
@@ -11,9 +12,8 @@ if (process.env.NODE_ENV !== "test") {
  * @returns PostgresSaver instance
  */
 export function createPostgresMemory(): PostgresSaver {
-  const connectionString = `${process.env.DATABASE_URL}${
-    process.env.DB_SSLMODE ? `?sslmode=${process.env.DB_SSLMODE}` : ""
-  }`;
+  const connectionString = `${process.env.DATABASE_URL}${process.env.DB_SSLMODE ? `?sslmode=${process.env.DB_SSLMODE}` : ""
+    }`;
   return PostgresSaver.fromConnString(connectionString);
 }
 

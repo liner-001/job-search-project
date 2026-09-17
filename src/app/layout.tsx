@@ -18,7 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
-        <title>LangGraph & NextJS Agent</title>
+        <title>JobPilot AI - 智能求职 Agent 工作台</title>
       </head>
       <body>
         <QueryClientProvider client={queryClient}>

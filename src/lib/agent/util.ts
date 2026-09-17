@@ -1,10 +1,14 @@
+// 模型工厂：provider/model 是怎么变成真正可调用的大模型对象的  provider: openai model: deepseek-v4-flash最后就是在这个文件里被处理。
+// LangChain 对不同模型厂商的封装
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatAnthropic } from "@langchain/anthropic";
+// 所有聊天模型的共同父类型  上层 Agent 不需要关心具体厂商，只要拿到一个统一的 llm 对象就能用
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { DynamicStructuredTool } from "@langchain/core/tools";
-
+// 这个类型定义了创建模型时需要的参数温度参数，可选。越低越稳定，越高越发散。
 export interface CreateChatModelOptions {
+  // 模型供应商，可选。
   provider?: string; // 'openai' | 'google' | 'anthropic'
   model: string;
   temperature?: number;
@@ -13,6 +17,22 @@ export interface CreateChatModelOptions {
 /**
  * Central factory for creating a chat model based on provider + model name.
  */
+// 根据 provider 和 model 创建对应的大模型实例
+// 调用时传一个对象  返回值:BaseChatModel  表示这个函数返回一个统一的大模型对象。
+// : CreateChatModelOptions是TypeScript 类型注解  解构的这个对象参数必须符合 CreateChatModelOptions 类型   CreateChatModelOptions 应该是一个接口或类型别名，定义了对象的结构
+// : BaseChatModel - 函数返回类型
+// 不解构的话是这个样子
+// export function createChatModel(
+//   options: CreateChatModelOptions
+// ): BaseChatModel {
+//   const provider = options.provider ?? "google";
+//   const model = options.model;
+//   const temperature = options.temperature ?? 1;
+
+//   switch (provider) {
+//     // ...
+//   }
+// }
 export function createChatModel({
   provider = "google",
   model,
@@ -20,7 +40,17 @@ export function createChatModel({
 }: CreateChatModelOptions): BaseChatModel {
   switch (provider) {
     case "openai":
-      return new ChatOpenAI({ model, temperature });
+      // return new ChatOpenAI({ model, temperature });
+      // 这段最重要，因为你接 DeepSeek 就靠它  new ChatOpenAI(...) 创建一个 OpenAI 客户端。
+      // DeepSeek 的 API 是 OpenAI-compatible，也就是：请求格式兼容 OpenAI所以可以继续用：ChatOpenAI只要改：baseURL
+      return new ChatOpenAI({
+        model,
+        temperature,
+        apiKey: process.env.OPENAI_API_KEY,
+        configuration: process.env.OPENAI_BASE_URL
+          ? { baseURL: process.env.OPENAI_BASE_URL }
+          : undefined,
+      });
     case "anthropic":
       return new ChatAnthropic({ model, temperature });
     case "google":
@@ -28,6 +58,7 @@ export function createChatModel({
       return new ChatGoogleGenerativeAI({ model, temperature });
   }
 }
+// ensureAgent 接收的配置类型
 export interface AgentConfigOptions {
   model?: string;
   provider?: string; // 'google' | 'openai' etc.
@@ -40,6 +71,8 @@ export interface AgentConfigOptions {
  * JSON Schema keywords that are not supported by Google Gemini's function calling API.
  * These need to be stripped from tool schemas before passing to the LLM.
  */
+// 让工具 schema 兼容 Gemini 的 function calling
+// sanitizeTool 是为 Gemini 工具调用做兼容处理的。
 const UNSUPPORTED_SCHEMA_KEYWORDS = new Set([
   "$schema",
   "$id",
@@ -214,5 +247,5 @@ export function sanitizeTool(tool: DynamicStructuredTool): DynamicStructuredTool
 
   return tool;
 }
-export const DEFAULT_MODEL_PROVIDER = "google";
-export const DEFAULT_MODEL_NAME = "gemini-3-flash-preview";
+export const DEFAULT_MODEL_PROVIDER = "openai";
+export const DEFAULT_MODEL_NAME = "deepseek-v4-flash";

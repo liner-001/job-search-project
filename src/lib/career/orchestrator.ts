@@ -1,4 +1,5 @@
 import { answerWithCareerRag } from "@/lib/career/rag";
+import prisma from "@/lib/database/prisma";
 
 export type CareerIntent =
   | "resume_summary"
@@ -62,6 +63,23 @@ export function shouldUseCareerOrchestrator(message: string) {
   return detectCareerIntent(message) !== "general";
 }
 
+async function answerForUser(userId: string, query: string) {
+  const resume = await prisma.resume.findFirst({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    select: { id: true },
+  });
+  if (!resume) {
+    return {
+      query,
+      answer: "当前没有可检索的简历内容，请先在简历中心上传简历。",
+      retrievedDocs: [],
+      embeddingProvider: "none",
+    };
+  }
+  return answerWithCareerRag(query, { resumeId: resume.id });
+}
+
 function formatSourceList(result: Awaited<ReturnType<typeof answerWithCareerRag>>) {
   if (result.retrievedDocs.length === 0) {
     return "没有检索到相关简历片段，请先在简历中心上传简历。";
@@ -84,11 +102,14 @@ function formatTrace(result: CareerOrchestratorResult) {
   ].join("\n");
 }
 
-export async function runCareerOrchestrator(message: string): Promise<CareerOrchestratorResult> {
+export async function runCareerOrchestrator(
+  message: string,
+  userId: string,
+): Promise<CareerOrchestratorResult> {
   const intent = detectCareerIntent(message);
 
   if (intent === "resume_summary") {
-    const ragResult = await answerWithCareerRag(message);
+    const ragResult = await answerForUser(userId, message);
 
     return {
       answer: [ragResult.answer, "", "### RAG 检索来源", formatSourceList(ragResult)].join("\n"),
@@ -104,7 +125,8 @@ export async function runCareerOrchestrator(message: string): Promise<CareerOrch
   }
 
   if (intent === "jd_match") {
-    const ragResult = await answerWithCareerRag(
+    const ragResult = await answerForUser(
+      userId,
       `请从我的简历中提取与这个岗位/JD匹配相关的技能、项目和经历：${message}`,
     );
 
@@ -129,7 +151,8 @@ export async function runCareerOrchestrator(message: string): Promise<CareerOrch
   }
 
   if (intent === "interview") {
-    const ragResult = await answerWithCareerRag(
+    const ragResult = await answerForUser(
+      userId,
       `根据我的简历项目和技能，生成模拟面试问题：${message}`,
     );
 
@@ -147,7 +170,8 @@ export async function runCareerOrchestrator(message: string): Promise<CareerOrch
   }
 
   if (intent === "application_plan") {
-    const ragResult = await answerWithCareerRag(
+    const ragResult = await answerForUser(
+      userId,
       `根据我的简历，给出投递规划和岗位方向建议：${message}`,
     );
 

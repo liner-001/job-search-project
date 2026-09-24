@@ -23,7 +23,7 @@
 
 import { Thread } from "../Thread";
 
-export const AgentChatPanel = () => {
+export const AgentChatPanel = ({ threadId }: { threadId: string }) => {
   return (
     <section className="h-[calc(100vh-48px)]">
       <div className="mb-4">
@@ -34,7 +34,7 @@ export const AgentChatPanel = () => {
       </div>
 
       <div className="relative h-[calc(100%-72px)] overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <Thread threadId="jobpilot-agent-thread" />
+        <Thread threadId={threadId} />
       </div>
     </section>
   );

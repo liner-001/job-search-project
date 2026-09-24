@@ -28,16 +28,18 @@ const langfuseHandler = process.env.LANGFUSE_ENABLED === "true" ? new CallbackHa
  */
 // 这个函数被 route.ts 调用
 export async function streamResponse(params: {
+  userId: string;
   // 当前会话 ID  用户输入内容  模型、provider、附件、工具审批等配置
   threadId: string;
   userText: string;
   opts?: MessageOptions;
 }) {
   // 解构参数  const threadId = params.threadId;
-  const { threadId, userText, opts } = params;
+  const { userId, threadId, userText, opts } = params;
+  const checkpointThreadId = `${userId}:${threadId}`;
   // 确保数据库中存在当前会话。如果是新 thread，就创建
   // 为什么传 userText  可以用第一条消息生成 thread 标题  你好，请帮我分析简历可以变成会话标题
-  await ensureThread(threadId, userText);
+  await ensureThread(userId, threadId, userText);
 
   // If allowTool is present, use Command with resume action instead of regular inputs
   if (opts?.allowTool) {
@@ -57,15 +59,13 @@ export async function streamResponse(params: {
       approveAllTools: opts?.approveAllTools,
     });
 
-    // Type assertion needed for Command union with state update in v1
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     // 真正调用 LangGraph Agent  agent.stream(...)以流式方式执行 Agent
     // inputs as any Agent 输入，这里是恢复命令 Command  as any 是类型绕过，因为 LangGraph 的类型比较复杂
-    const iterable = await agent.stream(inputs as any, {
+    const iterable = await agent.stream(inputs as Parameters<typeof agent.stream>[0], {
       // 表示只要 Agent 状态有更新，就流式返回
       streamMode: ["updates"],
       // 告诉 LangGraph：当前执行属于哪个 thread
-      configurable: { thread_id: threadId },
+      configurable: { thread_id: checkpointThreadId },
       ...(langfuseHandler ? { callbacks: [langfuseHandler] } : {}),
     });
     // Agent 原始输出格式比较复杂用 generator 转换成前端要的：MessageResponse
@@ -105,14 +105,12 @@ export async function streamResponse(params: {
     approveAllTools: opts?.approveAllTools,
   });
 
-  // Type assertion needed for Command union with state update in v1
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   // 流式执行 Agent  Agent 真正运行的地方  agent.stream启动 Agent 执行。
-  const iterable = await agent.stream(inputs as any, {
+  const iterable = await agent.stream(inputs as Parameters<typeof agent.stream>[0], {
     // 让 LangGraph 每次有更新都返回
     streamMode: ["updates"],
     // 告诉 checkpoint：这个会话的状态存到这个 thread_id 下
-    configurable: { thread_id: threadId },
+    configurable: { thread_id: checkpointThreadId },
     ...(langfuseHandler ? { callbacks: [langfuseHandler] } : {}),
   });
   // 把 LangGraph 原始输出转成前端消息流
@@ -222,13 +220,16 @@ function processAIMessage(message: Record<string, unknown>): MessageResponse | n
 
 /** Fetch prior messages for a thread from the LangGraph checkpoint/memory system. */
 // 根据 threadId 获取历史消息。
-export async function fetchThreadHistory(threadId: string): Promise<MessageResponse[]> {
+export async function fetchThreadHistory(
+  userId: string,
+  threadId: string,
+): Promise<MessageResponse[]> {
   // 先查数据库里有没有这个 thread。如果没有，返回空数组。
-  const thread = await prisma.thread.findUnique({ where: { id: threadId } });
+  const thread = await prisma.thread.findFirst({ where: { id: threadId, userId } });
   if (!thread) return [];
   try {
     // 从 LangGraph checkpoint/memory 中取历史消息
-    const history = await getHistory(threadId);
+    const history = await getHistory(`${userId}:${threadId}`);
     // 然后把 LangChain BaseMessage 转成普通对象：msg.toDict()并断言成：MessageResponse
     return history.map((msg: BaseMessage) => msg.toDict() as MessageResponse);
   } catch (e) {

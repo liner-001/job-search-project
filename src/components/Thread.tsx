@@ -13,7 +13,7 @@ import MessageList from "./MessageList";
 import { useChatThread } from "@/hooks/useChatThread";
 import { Loader2 } from "lucide-react";
 import { ScrollArea } from "./ui/scroll-area";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { MessageOptions } from "@/types/message";
 // Props 类型 组件接收两个 props
 interface ThreadProps {
@@ -38,7 +38,7 @@ export const Thread = ({ threadId, onFirstMessageSent }: ThreadProps) => {
   // 创建一个 ref，初始值是 false 当前是否已经发起过第一条消息
   const firstMessageInitiatedRef = useRef(false);
   // 保存状态：是否正在等待新会话的第一条 AI 回复
-  const [awaitingFirstResponse, setAwaitingFirstResponse] = useState(false);
+  const awaitingFirstResponseRef = useRef(false);
   // Thread 传给 MessageInput 的函数
   const handleSendMessage = async (message: string, opts?: MessageOptions) => {
     // 判断当前会话是不是空会话 如果还没有任何消息，说明这是这个 thread 的第一条消息
@@ -48,7 +48,7 @@ export const Thread = ({ threadId, onFirstMessageSent }: ThreadProps) => {
     if (wasEmpty) {
       // 我正在等待这个新会话的第一条 AI 回复
       firstMessageInitiatedRef.current = true;
-      setAwaitingFirstResponse(true);
+      awaitingFirstResponseRef.current = true;
     }
   };
   // 检测第一条 AI 回复是否来了
@@ -56,7 +56,7 @@ export const Thread = ({ threadId, onFirstMessageSent }: ThreadProps) => {
   // Detect first AI/tool/error message arrival after initial user message to trigger redirect
   useEffect(() => {
     // 如果正在等待第一条回复，并且当前已经不在发送中
-    if (awaitingFirstResponse && !isSending) {
+    if (awaitingFirstResponseRef.current && !isSending) {
       // 检查消息列表里有没有非 human 消息； human：用户消息 ；非 human：AI 消息、工具消息、错误消息等
       // 数组里只要有一个满足条件，就返回 true
       // 所以这行意思是：消息列表里是否已经出现 AI/tool/error 之类的回复
@@ -64,12 +64,12 @@ export const Thread = ({ threadId, onFirstMessageSent }: ThreadProps) => {
 
       if (hasNonHuman) {
         // 不再等待
-        setAwaitingFirstResponse(false);
+        awaitingFirstResponseRef.current = false;
         // 如果父组件传了 onFirstMessageSent，就调用它
         if (onFirstMessageSent) onFirstMessageSent(threadId);
       }
     }
-  }, [awaitingFirstResponse, isSending, messages, onFirstMessageSent, threadId]);
+  }, [isSending, messages, onFirstMessageSent, threadId]);
 
   if (isLoadingHistory) {
     return (

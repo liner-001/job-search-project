@@ -13,57 +13,83 @@ datasource db {
 model Thread {
   id        String   @id @default(uuid())
   title     String
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId, updatedAt])
+}
+
+model User {
+  id                String             @id @default(uuid())
+  name              String
+  email             String             @unique
+  passwordHash      String
+  threads           Thread[]
+  resumes           Resume[]
+  jobDescriptions   JobDescription[]
+  jobApplications   JobApplication[]
+  interviewSessions InterviewSession[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 }
 
 model MCPServer {
-  id        String            @id @default(uuid())
-  name      String            @unique
-  type      MCPServerType
-  enabled   Boolean           @default(true)
+  id           String        @id @default(uuid())
+  name         String        @unique
+  type         MCPServerType
+  enabled      Boolean       @default(true)
   // For stdio servers
-  command   String?
-  args      Json?
-  env       Json?
+  command      String?
+  args         Json?
+  env          Json?
   // For http servers
-  url       String?
-  headers   Json?
+  url          String?
+  headers      Json?
   // OAuth fields (for http servers)
-  requiresAuth  Boolean?      @default(false)
-  authTokens    Json?         // OAuthTokens: { access_token, refresh_token, expires_at, token_type, scope }
-  clientInfo    Json?         // OAuthClientInformation: { client_id, client_secret, ... }
-  codeVerifier  String?       // PKCE code verifier for ongoing OAuth flow
-  oauthStatus   String?       @default("UNKNOWN") // UNKNOWN | NOT_REQUIRED | REQUIRED | CONNECTED | EXPIRED
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
+  requiresAuth Boolean?      @default(false)
+  authTokens   Json? // OAuthTokens: { access_token, refresh_token, expires_at, token_type, scope }
+  clientInfo   Json? // OAuthClientInformation: { client_id, client_secret, ... }
+  codeVerifier String? // PKCE code verifier for ongoing OAuth flow
+  oauthStatus  String?       @default("UNKNOWN") // UNKNOWN | NOT_REQUIRED | REQUIRED | CONNECTED | EXPIRED
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 }
 
 model JobApplication {
-  id          String   @id @default(uuid())
-  company    String
-  position   String
-  status     String   @default("待投递")
-  matchScore Int      @default(75)
-  nextAction String?
+  id               String          @id @default(uuid())
+  company          String
+  position         String
+  status           String          @default("待投递")
+  matchScore       Int             @default(75)
+  nextAction       String?
   jobDescriptionId String?
   jobDescription   JobDescription? @relation(fields: [jobDescriptionId], references: [id])
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  userId           String?
+  user             User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([userId, createdAt])
 }
 
 model JobDescription {
-  id          String   @id @default(uuid())
-  title       String?
-  content     String
-  matchScore  Int
-  level       String
-  strengths   Json
-  weaknesses  Json
-  suggestions Json
+  id           String           @id @default(uuid())
+  title        String?
+  content      String
+  matchScore   Int
+  level        String
+  strengths    Json
+  weaknesses   Json
+  suggestions  Json
   applications JobApplication[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  userId       String?
+  user         User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([userId, createdAt])
 }
 
 model Resume {
@@ -76,21 +102,28 @@ model Resume {
   skills            Json
   projectHighlights Json
   suggestions       Json
+  userId            String?
+  user              User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+
+  @@index([userId, createdAt])
 }
 
-
 model InterviewSession {
-  id          String   @id @default(uuid())
+  id         String   @id @default(uuid())
   questionId String
   question   String
   answer     String
   score      Int
   dimensions Json
   suggestion String
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  @@index([userId, createdAt])
 }
 
 enum MCPServerType {

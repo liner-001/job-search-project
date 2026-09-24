@@ -12,30 +12,28 @@ interface ToastState {
 export function OAuthToast() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [toast, setToast] = useState<ToastState | null>(null);
-
-  useEffect(() => {
+  const [toast, setToast] = useState<ToastState | null>(() => {
     const oauthSuccess = searchParams.get("oauth_success");
     const oauthError = searchParams.get("oauth_error");
     const serverName = searchParams.get("server");
 
     if (oauthSuccess === "true") {
-      setToast({
+      return {
         type: "success",
         message: serverName
           ? `Successfully connected to "${serverName}"`
           : "OAuth connection successful",
-      });
-      // Clean up URL params and redirect to original path
-      const returnPath = sessionStorage.getItem("oauth_return_path") || "/";
-      sessionStorage.removeItem("oauth_return_path");
-      router.replace(returnPath, { scroll: false });
-    } else if (oauthError) {
-      setToast({
-        type: "error",
-        message: `OAuth error: ${oauthError}`,
-      });
-      // Clean up URL params and redirect to original path
+      };
+    }
+    return oauthError
+      ? { type: "error", message: `OAuth error: ${oauthError}` }
+      : null;
+  });
+
+  useEffect(() => {
+    const oauthSuccess = searchParams.get("oauth_success");
+    const oauthError = searchParams.get("oauth_error");
+    if (oauthSuccess === "true" || oauthError) {
       const returnPath = sessionStorage.getItem("oauth_return_path") || "/";
       sessionStorage.removeItem("oauth_return_path");
       router.replace(returnPath, { scroll: false });

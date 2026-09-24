@@ -1,34 +1,22 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { Search } from "lucide-react";
+import { ragRequestSchema, ragResponseSchema, type RagResponse } from "@/lib/career/rag/schema";
 
-interface RagSource {
-  id: string;
-  title: string;
-  content: string;
-  chunkIndex: number;
-  score: number;
-  citation: string;
-}
-
-interface RagResponse {
-  query: string;
-  answer: string;
-  retrievedDocs: RagSource[];
-  embeddingProvider: string;
-}
-
-export const RagPanel = () => {
+export function RagPanel() {
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<RagResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (event: FormEvent) => {
+  async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!query.trim() || isLoading) return;
-
+    const input = ragRequestSchema.safeParse({ query });
+    if (!input.success) {
+      setError(input.error.issues[0]?.message ?? "请输入问题");
+      return;
+    }
     setIsLoading(true);
     setError("");
     setResult(null);
@@ -36,29 +24,42 @@ export const RagPanel = () => {
       const response = await fetch("/api/career/rag", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: query.trim() }),
+        body: JSON.stringify(input.data),
       });
-      const payload = (await response.json()) as RagResponse & { error?: string };
-      if (!response.ok) throw new Error(payload.error || "RAG 检索失败");
-      setResult(payload);
+      const payload: unknown = await response.json();
+      if (!response.ok) {
+        const message =
+          payload &&
+          typeof payload === "object" &&
+          "error" in payload &&
+          typeof payload.error === "string"
+            ? payload.error
+            : "知识库检索失败";
+        throw new Error(message);
+      }
+      const parsed = ragResponseSchema.safeParse(payload);
+      if (!parsed.success) throw new Error("服务器返回的检索数据不完整");
+      setResult(parsed.data);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "RAG 检索失败");
+      setError(caught instanceof Error ? caught.message : "知识库检索失败");
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
   return (
     <section>
-      <div className="mb-6">
-        <h2 className="text-2xl font-semibold">简历知识库</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          基于最近上传的简历进行向量检索，回答会标注对应原文片段。
+      <header>
+        <h1 className="text-3xl font-bold">简历知识库</h1>
+        <p className="mt-2 text-sm text-slate-500">
+          从简历向量索引中检索原文，让回答带有可追溯证据。
         </p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="border-slate-200 bg-white p-5">
-        <label htmlFor="rag-query" className="text-sm font-medium text-slate-700">
+      </header>
+      <form
+        onSubmit={submit}
+        className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+      >
+        <label htmlFor="rag-query" className="text-sm font-medium">
           向简历提问
         </label>
         <div className="mt-3 flex gap-3">
@@ -66,60 +67,49 @@ export const RagPanel = () => {
             id="rag-query"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="例如：我有哪些 Agent 项目经验？请给出原文依据"
-            className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900"
+            className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            placeholder="例如：我有哪些 Agent 项目经验？"
           />
           <button
-            type="submit"
-            disabled={!query.trim() || isLoading}
-            className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+            disabled={isLoading}
+            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm text-white disabled:bg-slate-300"
           >
             <Search className="h-4 w-4" />
-            {isLoading ? "检索中..." : "开始检索"}
+            {isLoading ? "检索中…" : "检索"}
           </button>
         </div>
       </form>
-
       {error && (
-        <div className="mt-4 border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <p className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {error}
-        </div>
+        </p>
       )}
-
       {result && (
-        <div className="mt-5 space-y-5">
-          <div className="border border-slate-200 bg-white p-5">
-            <div className="flex items-center justify-between gap-4">
-              <h3 className="font-medium">Agent 回答</h3>
-              <span className="text-xs text-slate-500">
-                Embedding：{result.embeddingProvider}
-              </span>
+        <div className="mt-6 space-y-4">
+          <article className="rounded-xl border border-slate-200 bg-white p-5">
+            <div className="flex justify-between gap-3">
+              <h2 className="font-semibold">回答</h2>
+              <span className="text-xs text-slate-500">{result.embeddingProvider}</span>
             </div>
-            <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-slate-700">
+            <p className="mt-4 text-sm leading-7 whitespace-pre-wrap text-slate-700">
               {result.answer}
             </p>
-          </div>
-
-          <div>
-            <h3 className="text-sm font-medium text-slate-700">
-              检索来源（{result.retrievedDocs.length}）
-            </h3>
-            <div className="mt-3 grid gap-3">
-              {result.retrievedDocs.map((document, index) => (
-                <article key={document.id} className="border border-slate-200 bg-white p-4">
-                  <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
-                    <span>[{index + 1}] {document.citation}</span>
-                    <span>相似度 {Math.round(document.score * 100)}%</span>
-                  </div>
-                  <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-                    {document.content}
-                  </p>
-                </article>
-              ))}
-            </div>
-          </div>
+          </article>
+          {result.retrievedDocs.map((doc, index) => (
+            <article key={doc.id} className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex justify-between gap-3 text-xs text-slate-500">
+                <span>
+                  [{index + 1}] {doc.citation}
+                </span>
+                <span>{Math.round(doc.score * 100)}%</span>
+              </div>
+              <p className="mt-3 text-sm leading-6 whitespace-pre-wrap text-slate-600">
+                {doc.content}
+              </p>
+            </article>
+          ))}
         </div>
       )}
     </section>
   );
-};
+}

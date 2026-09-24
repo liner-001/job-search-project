@@ -1,36 +1,20 @@
-"use client";
-import { Suspense } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { Metadata } from "next";
 import "./globals.css";
-import { ThreadProvider } from "@/contexts/ThreadContext";
-import { UISettingsProvider } from "@/contexts/UISettingsContext";
-import { OAuthToast } from "@/components/OAuthToast";
+import { Providers } from "./providers";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 60 * 1000, // 1 minute
-    },
+export const metadata: Metadata = {
+  title: {
+    default: "JobPilot AI - 智能求职 Agent 工作台",
+    template: "%s | JobPilot AI",
   },
-});
+  description: "基于 Next.js 与 LangGraph.js 的智能求职 Agent 工作台。",
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <head>
-        <title>JobPilot AI - 智能求职 Agent 工作台</title>
-      </head>
+    <html lang="zh-CN">
       <body>
-        <QueryClientProvider client={queryClient}>
-          <UISettingsProvider>
-            <ThreadProvider>
-              <Suspense fallback={null}>
-                <OAuthToast />
-              </Suspense>
-              {children}
-            </ThreadProvider>
-          </UISettingsProvider>
-        </QueryClientProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

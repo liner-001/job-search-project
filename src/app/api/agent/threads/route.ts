@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Thread } from "@/types/message";
 import prisma from "@/lib/database/prisma";
 import { UpdateThreadBody, DeleteThreadBody } from "./schema";
+import { getCurrentUser } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -13,7 +14,13 @@ type ThreadEntity = {
   updatedAt: Date;
 };
 export async function GET() {
-  const dbThreads = await prisma.thread.findMany({ orderBy: { updatedAt: "desc" }, take: 50 });
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const dbThreads = await prisma.thread.findMany({
+    where: { userId: user.id },
+    orderBy: { updatedAt: "desc" },
+    take: 50,
+  });
   const threads: Thread[] = dbThreads.map((t: ThreadEntity) => ({
     id: t.id,
     title: t.title,
@@ -24,7 +31,9 @@ export async function GET() {
 }
 
 export async function POST() {
-  const created = await prisma.thread.create({ data: { title: "New thread" } });
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const created = await prisma.thread.create({ data: { title: "New thread", userId: user.id } });
   const thread: Thread = {
     id: created.id,
     title: created.title,
@@ -36,11 +45,15 @@ export async function POST() {
 
 export async function PATCH(req: NextRequest) {
   try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const parsed = UpdateThreadBody.safeParse(await req.json());
     if (!parsed.success) {
       return NextResponse.json({ error: "id and title required" }, { status: 400 });
     }
     const { id, title } = parsed.data;
+    const owned = await prisma.thread.findFirst({ where: { id, userId: user.id } });
+    if (!owned) return NextResponse.json({ error: "Thread not found" }, { status: 404 });
     const updated = await prisma.thread.update({ where: { id }, data: { title } });
     return NextResponse.json(
       {
@@ -59,6 +72,8 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const parsed = DeleteThreadBody.safeParse(await req.json());
     if (!parsed.success) {
       return NextResponse.json({ error: "Thread id required" }, { status: 400 });
@@ -66,7 +81,7 @@ export async function DELETE(req: NextRequest) {
     const { id } = parsed.data;
 
     // First check if thread exists
-    const thread = await prisma.thread.findUnique({ where: { id } });
+    const thread = await prisma.thread.findFirst({ where: { id, userId: user.id } });
     if (!thread) {
       return NextResponse.json({ error: "Thread not found" }, { status: 404 });
     }

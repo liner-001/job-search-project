@@ -107,5 +107,6 @@ export function getFileExtension(mimeType: string): string {
  */
 export function isValidTextContent(buffer: Buffer): boolean {
   // For now, accept all content - validation can be added later
+  void buffer;
   return true;
 }

@@ -2,7 +2,7 @@
 // import { DEFAULT_SYSTEM_PROMPT as SYSTEM_PROMPT } from "./prompt";
 // // postgresCheckpointer 是 LangGraph 的状态存储器 负责：把 Agent 的执行状态保存到 PostgreSQL多轮记忆工具审批暂停/恢复刷新后恢复会话
 // import { postgresCheckpointer } from "./memory";
-// // 导入LangChain 的工具类型StructuredToolInterface可以理解成：结构化工具接口工具有：工具名工具描述参数 schema  执行函数 
+// // 导入LangChain 的工具类型StructuredToolInterface可以理解成：结构化工具接口工具有：工具名工具描述参数 schema  执行函数
 // // DynamicTool也是 LangChain 里的工具类型，用来给 Agent 调用。这里主要是 TypeScript 类型约束。
 // import type { DynamicTool, StructuredToolInterface } from "@langchain/core/tools";
 // // 导入模型工厂和默认模型配置
@@ -88,9 +88,6 @@
 // // Eagerly create a default agent at module load using env defaults.
 // export const defaultAgent = await ensureAgent();
 
-
-
-
 import { DEFAULT_SYSTEM_PROMPT as SYSTEM_PROMPT } from "./prompt";
 import { postgresCheckpointer } from "./memory";
 import type { DynamicTool, StructuredToolInterface } from "@langchain/core/tools";
@@ -173,6 +170,3 @@ export async function ensureAgent(cfg?: AgentConfigOptions) {
 export async function getAgent(cfg?: AgentConfigOptions) {
   return ensureAgent(cfg);
 }
-
-// Eagerly create a default agent at module load using env defaults.
-export const defaultAgent = await ensureAgent();

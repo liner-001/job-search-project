@@ -5,6 +5,8 @@ import { NextRequest } from "next/server";
 import { streamResponse } from "@/services/agentService";
 // 类型导入 MessageResponse:前后端统一消息格式    FileAttachment 附件格式
 import type { MessageResponse, FileAttachment } from "@/types/message";
+import { getCurrentUser } from "@/lib/auth/session";
+import { runWithUserContext } from "@/lib/auth/request-context";
 // 这个接口是动态的，不要静态缓存 因为每次聊天内容都不一样，必须动态执行。
 
 import {
@@ -25,6 +27,13 @@ export const runtime = "nodejs";
  */
 // route.ts 里 export GET，就处理 GET 请求
 export async function GET(req: NextRequest) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
   // req.url 是完整请求地址http://localhost:3000/api/agent/stream?content=你好&threadId=abc&model=deepseek-v4-flash&provider=openai
   // new URL(req.url)把字符串解析成 URL 对象 searchParams就是问号后面的参数。
   const { searchParams } = new URL(req.url);
@@ -43,9 +52,9 @@ export async function GET(req: NextRequest) {
 
   const tools = toolsParam
     ? toolsParam
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean)
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean)
     : undefined;
 
   // Parse attachments from JSON. 解析附件参数
@@ -102,10 +111,10 @@ export async function GET(req: NextRequest) {
       // 这是“RAG 短路模式”。
       // 当用户问求职知识类问题时，先不走大模型 Agent，而是直接走 answerWithCareerRag，
       // 把检索增强后的回答用 SSE 推给聊天框。其他问题仍然走原来的 streamResponse，不会破坏原 Agent 能力。
-      (async () => {
+      runWithUserContext(user.id, async () => {
         try {
           if (shouldUseCareerOrchestrator(userContent)) {
-            const result = await runCareerOrchestrator(userContent);
+            const result = await runCareerOrchestrator(userContent, user.id);
             const answer = formatCareerOrchestratorResult(result);
 
             send({
@@ -129,6 +138,7 @@ export async function GET(req: NextRequest) {
 
           // 调用 Agent 服务层  这是后端真正进入 Agent 的地方 和前端参数一一对应  params.set("model", opts.model)  searchParams.get("model")
           const iterable = await streamResponse({
+            userId: user.id,
             threadId,
             userText: userContent,
             opts: {
@@ -167,7 +177,7 @@ export async function GET(req: NextRequest) {
         } finally {
           controller.close();
         }
-      })();
+      });
     },
     // 如果前端断开连接，比如刷新页面、关闭标签页，流会触发 cancel
     cancel() {
